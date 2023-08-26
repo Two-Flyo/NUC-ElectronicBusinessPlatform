@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>订单信息管理</title>
+  <link rel="stylesheet" href="//lib.baomitu.com/layui/2.6.4/css/layui.min.css">
+</head>
+<body>
+<fieldset class="layui-elem-field layui-field-title" style="margin-top: 20px;">
+  <legend>订单信息管理</legend>
+</fieldset>
+<!-- 面板 -->
+<div class="layui-card">
+  <div class="layui-card-body">
+    <label class="layui-form-label">商品编号</label>
+    <div class="layui-input-inline">
+      <input type="text" id="orderId" class="layui-input">
+    </div>
+    <button onclick="search();" class="layui-btn">搜索</button>
+  </div>
+</div>
+
+<div style="padding: 20px;margin-bottom: 100px;">
+  <!-- 面板 -->
+  <div class="layui-col-md12">
+    <div class="layui-card">
+      <div class="layui-card-header">商品信息</div>
+      <div class="layui-card-body" id="order"></div>
+    </div>
+  </div>
+  <!-- 面板 -->
+  <div class="layui-col-md12">
+    <div class="layui-card">
+      <div class="layui-card-header">商品评价</div>
+      <div class="layui-card-body">
+        <!-- 时间线 -->
+        <ul class="layui-timeline" id="evaluate">
+
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="layui-col-md12">
+    <!-- 面板 -->
+    <div class="layui-card">
+      <div class="layui-card-header">商品列表</div>
+      <div class="layui-card-body">
+        <!-- 数据表格 -->
+        <table id="orderList" lay-filter="orderTable"></table>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- 头工具栏事件 筛选/导出/打印 -->
+<script type="text/html" id="toolbarDemo"></script>
+<!-- 行工具事件 -->
+<script type="text/html" id="barDemo">
+  <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+</script>
+
+<script src="//lib.baomitu.com/jquery/3.6.0/jquery.min.js"></script>
+<script src="//lib.baomitu.com/layui/2.6.4/layui.min.js"></script>
+<script>
+  // 搜索
+  function search() {
+    // 商品编号
+    var orderId = $("#orderId").val();
+    $.ajax({
+      url: "/order/" + orderId,
+      type: "GET",
+      dataType: "JSON",
+      // 拼接处理返回结果
+      success: function (order) {
+        if (order == null || order == undefined || order == "") {
+          layer.msg("商品不存在");
+          return;
+        }
+        // 处理订单信息
+        $("#order").append("商品编号：" + orderId + "<hr/>")
+                .append("商品名称：" + order["goodsName"] + "<br/>")
+                .append("商品类型：" + order["goodsType"] + "<br/>")
+                .append("生产厂家：" + order["manufacturer"] + "<br/>")
+                .append("商品描述：" + order["goodsDescription"] + "<br/>")
+                .append("商品单价：" + order["goodsPrice"] + "<br/>")
+                .append("商品数量：" + order['goodsNum'] + "<br/>")
+        // 获取物流信息
+        let evaluate = order['evaluate'];
+        console.log(order)
+        // 倒序循环
+        for (var i = evaluate.length - 1; i >= 0; i--) {
+          // 处理物流信息
+          $("#evaluate").append('<li class="layui-timeline-item">' +
+                  '<i class="layui-icon layui-timeline-axis"></i>' +
+                  '<div class="layui-timeline-content layui-text">' +
+                  '<h3 class="layui-timeline-title">' +
+                  '用户:' + evaluate[i].name  +
+                  '</h3>'+ '商品描述:'+ evaluate[i].level +
+                  '<h4>' +'评价内容:' + evaluate[i].evaluateInfo + '</h4>' +
+                  '评价时间:'+ evaluate[i].evaluateTime + '</p></div></li>');
+        }
+      },
+    });
+  }
+
+  // 数据表格
+  layui.use('table', function () {
+    var table = layui.table;
+
+    //第一个实例
+    table.render({
+      elem: '#orderList',
+      url: '/order/list', //数据接口
+      page: true, //开启分页
+      toolbar: '#toolbarDemo', // 头工具栏
+      cols: [[ // 表头
+        {field: 'id', title: '商品编号', sort: true, fixed: 'left'},
+        {field: 'orderTime', title: '入库时间', sort: true},
+        {field: 'goodsName', title: '商品名称'},
+        {field: 'goodsType', title: '商品类型'},
+        {field: 'manufacturer', title: '生产厂家'},
+        {field: 'goodsDescription', title: '商品描述', edit: 'text'},
+        {field: 'goodsPrice', title: '单价'},
+        {field: 'goodsNum', title: '数量'},
+        {fixed: 'right', title: '操作', toolbar: '#barDemo'} // 行工具栏
+      ]]
+    });
+
+    //工具条事件
+    table.on('tool(orderTable)', function (obj) { //注：tool 是工具条事件名，test 是 table 原始容器的属性 lay-filter="对应的值"
+      var data = obj.data; //获得当前行数据
+      var layEvent = obj.event; //获得 lay-event 对应的值（也可以是表头的 event 参数对应的值）
+      var tr = obj.tr; //获得当前行 tr 的 DOM 对象（如果有的话）
+
+      if (layEvent === 'detail') { //查看
+        //do somehing
+      } else if (layEvent === 'del') { //删除
+        layer.confirm('真的删除行么', function (index) {
+          obj.del(); //删除对应行（tr）的DOM结构，并更新缓存
+          layer.close(index);
+          //向服务端发送删除指令
+          $.ajax({
+            url: "/order/delete",
+            type: "POST",
+            data: {"id": data.id},
+            dataType: "JSON",
+            success: function (result) {
+              layer.msg(result);
+            }
+          });
+        });
+      } else if (layEvent === 'edit') { //编辑
+        //do something
+
+        //同步更新缓存对应的值
+        obj.update({
+          username: '123'
+          , title: 'xxx'
+        });
+      } else if (layEvent === 'LAYTABLE_TIPS') {
+        layer.alert('Hi，头部工具栏扩展的右侧图标。');
+      }
+    });
+  });
+</script>
+</body>
+</html>
